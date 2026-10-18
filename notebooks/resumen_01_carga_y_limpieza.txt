@@ -1,0 +1,343 @@
+================================================================================
+NOTEBOOK 01 — CARGA Y LIMPIEZA DEL DATASET
+"Student Performance Factors"
+================================================================================
+
+Archivo        : 01_carga_y_limpieza.ipynb
+Ubicación      : notebooks/01_carga_y_limpieza.ipynb
+Entrada        : data/raw/StudentPerformanceFactors.csv
+Salida         : data/processed/student_performance_clean.csv
+Versión        : 2.0 (final)
+Última revisión: [completar fecha]
+================================================================================
+
+
+1. OBJETIVO DEL NOTEBOOK
+--------------------------------------------------------------------------------
+
+Este notebook implementa la PRIMERA ETAPA del pipeline de datos del proyecto:
+la carga, el diagnóstico y la limpieza inicial del dataset "Student Performance
+Factors" (factores de desempeño estudiantil).
+
+El objetivo es transformar el dataset crudo (raw) en un dataset limpio
+(processed) que sirva como punto de partida reproducible para las etapas
+posteriores: análisis exploratorio (EDA), ingeniería de features y
+modelamiento predictivo.
+
+Todo el proceso está documentado celda por celda, y cada decisión de limpieza
+queda justificada en el propio notebook para garantizar la trazabilidad.
+
+
+2. CONTEXTO DEL DATASET
+--------------------------------------------------------------------------------
+
+El dataset original contiene información socioeconómica, académica y de
+hábitos de estudio de estudiantes, junto con su puntaje de examen final
+(Exam_Score). Está compuesto por:
+
+  - 6607 filas (registros de estudiantes)
+  - 20 columnas (variables)
+
+Tipos de variables:
+  - Numéricas   : Hours_Studied, Attendance, Sleep_Hours, Previous_Scores,
+                  Tutoring_Sessions, Physical_Activity, Exam_Score
+  - Categóricas : Parental_Involvement, Access_to_Resources,
+                  Extracurricular_Activities, Motivation_Level,
+                  Internet_Access, Family_Income, Teacher_Quality,
+                  School_Type, Peer_Influence, Learning_Disabilities,
+                  Parental_Education_Level, Distance_from_Home, Gender
+
+La variable objetivo original es Exam_Score (escala esperada: 0–100).
+Sobre ella se construye la variable binaria Approved (ver sección 3.5).
+
+
+3. ESTRUCTURA DEL NOTEBOOK (PASO A PASO)
+--------------------------------------------------------------------------------
+
+El notebook está organizado en 6 secciones numeradas, cada una con su
+respectivo markdown explicativo antes del código.
+
+--------------------------------------------------------------------------------
+3.1. CONFIGURACIÓN INICIAL
+--------------------------------------------------------------------------------
+
+- Importación de librerías: pandas, numpy, matplotlib, seaborn, pathlib.
+- Configuración visual: display de columnas, estilo de gráficos.
+- Definición de RANDOM_STATE = 42 para garantizar reproducibilidad.
+- Parámetros globales del pipeline (movidos a la sección 1.1):
+    * UMBRAL_APROBACION = 65
+    * SCORE_MIN, SCORE_MAX = 0, 100
+- Definición de rutas relativas a la raíz del repositorio:
+    * RAW_PATH       -> data/raw/StudentPerformanceFactors.csv
+    * PROCESSED_PATH -> data/processed/student_performance_clean.csv
+- Creación automática de la carpeta "processed" si no existe.
+
+--------------------------------------------------------------------------------
+3.2. CARGA Y DIAGNÓSTICO INICIAL
+--------------------------------------------------------------------------------
+
+Se carga el CSV indicando explícitamente que los strings "NA", "" y " "
+deben interpretarse como valores faltantes (NaN).
+
+Diagnóstico realizado:
+  a) Revisión de la estructura (df.info()): tipos de datos y nulos.
+  b) Estadísticas descriptivas de variables numéricas (df.describe()).
+  c) Resumen de variables categóricas (df.describe(include="object")).
+  d) Cuantificación de valores faltantes por columna (conteo y porcentaje).
+  e) Visualización de nulos mediante gráfico de barras horizontales.
+  f) Conteo de filas duplicadas.
+
+Hallazgos principales del diagnóstico:
+  - 6607 filas, 20 columnas, uso de memoria ~1 MB.
+  - 13 columnas categóricas (65% del dataset) y 7 numéricas.
+  - Columnas con más nulos:
+      * Parental_Education_Level : 90 (1.36%)
+      * Teacher_Quality          : 79 (1.20%)
+      * Distance_from_Home       : 68 (1.03%)
+  - El resto de columnas tienen entre 1 y 3 nulos (0.02% - 0.05%).
+  - No se detectaron filas duplicadas (0 duplicados).
+  - Exam_Score presenta valores fuera de rango: mínimo -65, máximo 101.
+  - Attendance presenta un valor negativo imposible (-91%).
+
+--------------------------------------------------------------------------------
+3.3. LIMPIEZA DEL TARGET Y DE ATTENDANCE
+--------------------------------------------------------------------------------
+
+Se analiza la distribución de Exam_Score y se detectan valores inválidos:
+  - 1 valor negativo (-65)
+  - 1 valor mayor a 100 (101)
+  - 2 valores nulos
+
+Decisiones aplicadas (ambas en la sección 3.2, ANTES de imputar):
+  a) Filtrar Exam_Score al rango válido [0, 100].
+     NOTA: este filtro también elimina los 2 nulos del target, porque las
+     comparaciones con NaN devuelven False. El target NO se imputa.
+  b) Filtrar Attendance al rango válido [0, 100], eliminando el valor
+     imposible -91% detectado en el diagnóstico.
+
+Resultado:
+  - 7 filas eliminadas en total (4 por Exam_Score + 3 por Attendance).
+  - Nuevo shape tras el filtro: (6600, 20).
+  - Verificación con asserts: rangos válidos confirmados.
+
+Justificación:
+  - Los valores fuera de escala son errores de captura y podrían sesgar
+    tanto el análisis descriptivo como el modelo.
+  - El orden importa: filtrar ANTES de imputar evita que valores como
+    Attendance = -91 contaminen la mediana/moda.
+
+--------------------------------------------------------------------------------
+3.4. MANEJO DE VALORES FALTANTES
+--------------------------------------------------------------------------------
+
+Estrategia de imputación aplicada:
+  - Variables numéricas   -> imputación con la MEDIANA (robusta a outliers).
+  - Variables categóricas -> imputación con la MODA (valor más frecuente).
+
+Columnas imputadas (16 en total):
+
+  Numéricas (mediana):
+    - Hours_Studied       : 20.0
+    - Tutoring_Sessions   :  1.0
+    - Physical_Activity   :  3.0
+
+  Categóricas (moda):
+    - Parental_Involvement       : Medium
+    - Access_to_Resources        : Medium
+    - Extracurricular_Activities : Yes
+    - Motivation_Level           : Medium
+    - Internet_Access            : Yes
+    - Family_Income              : Low
+    - Teacher_Quality            : Medium
+    - School_Type                : Public
+    - Peer_Influence             : Positive
+    - Parental_Education_Level   : High School
+    - Distance_from_Home         : Near
+    - Gender                     : Male
+
+Nota: Attendance ya no aparece en la imputación numérica porque sus 2 nulos
+se eliminaron en el filtro de la sección 3.2 (junto con la fila del -91%).
+
+Limpieza de categóricas:
+  - Se aplica str.strip() a todas las categóricas para eliminar espacios
+    al inicio/final.
+  - Se revisan value_counts() para confirmar que no hay inconsistencias
+    (mayúsculas mezcladas, sinónimos, etc.).
+
+Verificación final:
+  - Nulos restantes en el dataset: 0.
+
+Nota metodológica:
+  - Se eligió mediana/moda por ser una estrategia simple, transparente y
+    fácil de justificar en el EDA inicial.
+  - La propuesta original menciona KNN imputation como alternativa. Se deja
+    documentado que en la etapa de modelamiento se podría comparar contra
+    esta técnica más sofisticada.
+
+--------------------------------------------------------------------------------
+3.5. FEATURE ENGINEERING: VARIABLE OBJETIVO BINARIA "Approved"
+--------------------------------------------------------------------------------
+
+Se crea una nueva variable binaria "Approved" a partir de Exam_Score.
+Se usa el parámetro global UMBRAL_APROBACION definido en la sección 1.1:
+
+    UMBRAL_APROBACION = 65
+
+    Approved = 1  si  Exam_Score >= 65
+    Approved = 0  en caso contrario
+
+Resultado:
+  - Aprobados   (1): 5149 (78.02%)
+  - Reprobados  (0): 1451 (21.98%)
+
+Justificación del umbral 65 (vs. 59.5 original):
+  - El umbral 59.5 producía 98.97% aprobados / 1.03% reprobados, un
+    desbalance EXTREMO (~99:1) inviable para clasificación binaria.
+  - El valor 65 corresponde al percentil 25 de Exam_Score, genera clases
+    ~78/22 y alinea el análisis con la pregunta del proyecto
+    ("estudiantes que quizá no están al 100%").
+  - El diagnóstico automático del notebook clasifica este balance como
+    "aceptable para clasificación" (clase minoritaria > 20%).
+
+Nota: en modelamiento final se puede evaluar class_weight o SMOTE si se
+considera necesario.
+
+--------------------------------------------------------------------------------
+3.6. CASTEO DE TIPOS Y EXPORTACIÓN
+--------------------------------------------------------------------------------
+
+Casteos aplicados antes de exportar:
+  - Exam_Score     -> float
+  - Approved       -> int
+  - 13 categóricas -> category (más eficiente en memoria)
+
+Archivo generado:
+  - data/processed/student_performance_clean.csv
+
+Verificación post-export (asserts):
+  - El CSV tiene la misma forma que df.
+  - No quedan nulos en el CSV.
+  - La columna Approved existe.
+  - Exam_Score está entre 0 y 100.
+
+Shape final:
+  - 6600 filas × 21 columnas (20 originales + Approved).
+
+Nota sobre Parquet:
+  - Se consideró exportar también en formato Parquet para preservar el
+    tipo "category", pero se descartó porque no es requerido por la
+    rúbrica y no se ha visto esa materia en el curso.
+  - El CSV pierde el tipo "category" al releer; si en el modelamiento
+    se necesita preservarlo, se puede volver a castear en el Notebook 02
+    o migrar a Parquet en esa etapa.
+
+
+4. RESUMEN DE TRANSFORMACIONES APLICADAS
+--------------------------------------------------------------------------------
+
+  Métrica                          | Valor
+  ---------------------------------|--------------------------------------------
+  Filas iniciales                  | 6607
+  Filas eliminadas (fuera rango)   | 7 (4 target + 3 Attendance)
+  Filas finales                    | 6600
+  Columnas finales                 | 21 (20 + Approved)
+  Duplicados eliminados            | 0 (no había)
+  Columnas con imputación          | 15 (3 numéricas + 12 categóricas)
+  Nulos restantes                  | 0
+  Retención de datos               | 99.89%
+
+  Decisiones clave tomadas:
+    ✔ Filtrar outliers imposibles (Exam_Score y Attendance) ANTES de imputar.
+    ✔ Imputación con mediana/moda (documentada y reversible).
+    ✔ Creación de variable binaria Approved con umbral 65 (percentil 25).
+    ✔ Casteo de categóricas a tipo "category".
+    ✔ Exportación a CSV en data/processed/ con verificación post-export.
+
+
+5. HALLAZGOS Y OBSERVACIONES PARA LAS SIGUIENTES ETAPAS
+--------------------------------------------------------------------------------
+
+1. DESBALANCE TRATABLE resuelto.
+   -> Con umbral 65 se obtiene 78/22, viable para clasificación.
+   -> Ya no aplica la advertencia de desbalance extremo del umbral 59.5.
+
+2. Outlier de Attendance TRATADO.
+   -> El valor -91% se eliminó en la sección 3.2.
+   -> No queda pendiente para etapas posteriores.
+
+3. Variables casi constantes (revisar en EDA):
+   - Internet_Access       (~92% Yes)
+   - Learning_Disabilities (~89% No)
+   -> Evaluar su aporte real mediante análisis de asociación
+      (chi-cuadrado / V de Cramér) antes de incluirlas en el modelo.
+
+4. Distribución de Exam_Score muy concentrada (std ≈ 4.2).
+   -> La mayoría de estudiantes tiene notas entre 65 y 69.
+   -> En el EDA conviene revisar si la variable binaria Approved es más
+      informativa que un enfoque de regresión sobre Exam_Score.
+
+5. Relaciones no exploradas aún:
+   -> Correlaciones entre variables numéricas.
+   -> Asociación de categóricas con Approved.
+   -> Estos análisis corresponden al Notebook 02 (EDA).
+
+
+6. CÓMO EJECUTAR ESTE NOTEBOOK
+--------------------------------------------------------------------------------
+
+Requisitos:
+  - Python 3.10 o superior.
+  - Librerías: pandas, numpy, matplotlib, seaborn.
+  - Instalación:
+        pip install pandas numpy matplotlib seaborn
+
+Pasos:
+  1) Ubicar el archivo CSV original en: data/raw/
+  2) Abrir el notebook desde Jupyter Lab / Notebook / VS Code.
+  3) Ejecutar todas las celdas en orden (Kernel -> Restart & Run All).
+  4) Verificar que se genere:
+        data/processed/student_performance_clean.csv
+  5) Revisar la celda final "Resumen del proceso de limpieza" para
+     validar las métricas finales.
+
+Tiempo estimado de ejecución: < 1 minuto.
+
+
+7. DEPENDENCIAS CON OTROS NOTEBOOKS
+--------------------------------------------------------------------------------
+
+  Notebook anterior : (ninguno — este es el punto de partida del pipeline)
+  Notebook siguiente: 02_eda.ipynb
+                      -> Consume el CSV generado en data/processed/.
+                      -> Análisis univariado, bivariado y multivariado.
+                      -> Evaluación de asociación con Exam_Score/Approved.
+
+  Notebooks posteriores:
+    03_feature_engineering.ipynb  -> encoding, escalado, selección.
+    04_modeling.ipynb             -> entrenamiento y evaluación de modelos.
+
+
+8. AUTORÍA Y CONTROL DE VERSIONES
+--------------------------------------------------------------------------------
+
+  Autor/a    : [completar nombre]
+  Curso      : [completar curso]
+  Docente    : [completar docente]
+  Institución: [completar institución]
+
+  Historial de cambios:
+  v1.0 — [fecha] — Versión inicial del pipeline de carga y limpieza.
+                  Incluye imputación mediana/moda, filtrado del target,
+                  creación de Approved (umbral 59.5) y exportación.
+
+  v2.0 — [fecha] — Versión final corregida:
+                  * Umbral de Approved cambiado a 65 (resuelve desbalance).
+                  * Filtro de Attendance agregado (elimina -91%).
+                  * Outliers filtrados ANTES de imputar (orden correcto).
+                  * Asserts de verificación post-export agregados.
+                  * Parámetros globales movidos a sección 1.1.
+                  * Documentación actualizada en cada sección.
+
+================================================================================
+Fin del documento.
+================================================================================

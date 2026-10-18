@@ -1,0 +1,360 @@
+================================================================================
+NOTEBOOK 02 — ANÁLISIS EXPLORATORIO DE DATOS (EDA)
+"Student Performance Factors"
+================================================================================
+
+Archivo        : 02_eda.ipynb
+Ubicación      : notebooks/02_eda.ipynb
+Entrada        : data/processed/student_performance_clean.csv
+Salida         : Hallazgos, visualizaciones y decisiones documentadas
+Versión        : 1.0 (final)
+Última revisión: [completar fecha]
+================================================================================
+
+
+1. OBJETIVO DEL NOTEBOOK
+--------------------------------------------------------------------------------
+
+Este notebook implementa la SEGUNDA ETAPA del pipeline de datos: el Análisis
+Exploratorio de Datos (EDA) sobre el dataset limpio generado en el Notebook 01.
+
+Los objetivos específicos son:
+  1. Analizar la distribución de la variable objetivo (Exam_Score y Approved).
+  2. Explorar las relaciones entre las variables y el rendimiento académico,
+     guiados por los cuatro ejes temáticos del proyecto.
+  3. Cuantificar la asociación de variables categóricas con Approved mediante
+     pruebas de chi-cuadrado y V de Cramér.
+  4. Generar visualizaciones claras y legibles para el video de avance (Entrega 2).
+  5. Sintetizar hallazgos y proponer la ruta metodológica hacia el modelamiento
+     (Entrega 3).
+
+Este notebook es la base del video de avance. Cada gráfico está acompañado de su
+interpretación para facilitar la narrativa del video.
+
+
+2. CONTEXTO DEL DATASET
+--------------------------------------------------------------------------------
+
+Se carga el dataset procesado en el Notebook 01, que contiene:
+  - 6600 filas (registros de estudiantes)
+  - 21 columnas (20 originales + la variable binaria Approved)
+
+Se realiza un re-casteo de las variables categóricas, ya que el formato CSV
+pierde el tipo "category" al releerlo. También se define un diccionario de
+órdenes para las variables ordinales, útil para los boxplots.
+
+La variable objetivo principal para el análisis es Approved, con una
+distribución de ~78% aprobados y ~22% reprobados.
+
+
+3. ESTRUCTURA DEL NOTEBOOK (PASO A PASO)
+--------------------------------------------------------------------------------
+
+El notebook está organizado en 11 secciones numeradas, cada una con su
+respectivo markdown explicativo antes del código.
+
+--------------------------------------------------------------------------------
+3.1. CONFIGURACIÓN Y CARGA
+--------------------------------------------------------------------------------
+
+- Importación de librerías: pandas, numpy, matplotlib, seaborn, scipy.stats.
+- Configuración visual y de reproducibilidad.
+- Carga del CSV desde data/processed/.
+- Re-casteo de categóricas y definición de órdenes para variables ordinales.
+- Nota sobre el umbral de Approved (65 en lugar de 59.5) para mantener la
+  trazabilidad con la Entrega 1.
+
+--------------------------------------------------------------------------------
+3.2. ANÁLISIS UNIVARIADO
+--------------------------------------------------------------------------------
+
+- Se analiza la distribución de Exam_Score. Se observa que está fuertemente
+  concentrada (std ≈ 3.87, curtosis alta) entre 65 y 69, con una cola larga a
+  la derecha. La distribución no es normal.
+- Se confirma la distribución de Approved: 78.02% aprobados vs 21.98% reprobados.
+- Implicación: la baja varianza de Exam_Score sugiere que un modelo de
+  clasificación binaria (Approved) es más informativo que una regresión sobre
+  Exam_Score. Esta es una decisión preliminar clave para la Entrega 3.
+
+--------------------------------------------------------------------------------
+3.3. EJE 1: ESFUERZO ACADÉMICO
+--------------------------------------------------------------------------------
+
+Variables analizadas: Hours_Studied, Attendance, Previous_Scores.
+
+Hallazgos:
+  - Asistencia (Attendance): es la variable con la diferencia más clara entre
+    aprobados y reprobados (mediana ~85% vs ~70%). Es el predictor individual
+    más fuerte.
+  - Horas de estudio: también diferencia, pero con mayor solapamiento.
+  - Notas previas: diferencia moderada; es un predictor exógeno al esfuerzo actual.
+
+Conclusión: el esfuerzo académico, liderado por la asistencia, es el bloque de
+variables más prometedor.
+
+--------------------------------------------------------------------------------
+3.4. EJE 2: CALIDAD SOCIOECONÓMICA
+--------------------------------------------------------------------------------
+
+Variables analizadas: Family_Income, Parental_Education_Level, School_Type.
+
+Hallazgos:
+  - Ingreso familiar: tendencia leve al alza (Low < Medium < High), pero con gran
+    solapamiento entre grupos.
+  - Educación parental: diferencias mínimas entre High School, College y
+    Postgraduate.
+  - Tipo de escuela: distribuciones casi idénticas entre pública y privada.
+
+Conclusión: el contexto socioeconómico tiene un efecto débil o mediado por otras
+variables (probablemente por acceso a recursos y tutorías). No se espera que
+aporte mucho al modelo en forma directa.
+
+--------------------------------------------------------------------------------
+3.5. EJE 3: BIENESTAR FÍSICO Y CONDUCTUAL
+--------------------------------------------------------------------------------
+
+Variables analizadas: Sleep_Hours, Physical_Activity, Motivation_Level.
+
+Hallazgos:
+  - Horas de sueño: sin diferencia clara entre aprobados y reprobados.
+  - Actividad física: distribuciones prácticamente idénticas.
+  - Motivación: es la única variable del eje con señal; a mayor motivación, mayor
+    mediana de Exam_Score, aunque la diferencia es moderada (~2 puntos).
+
+Conclusión: el bienestar físico no discrimina el rendimiento en este dataset. La
+motivación sí aporta, pero con efecto limitado.
+
+--------------------------------------------------------------------------------
+3.6. EJE 4: APOYO Y RECURSOS EDUCATIVOS
+--------------------------------------------------------------------------------
+
+Variables analizadas: Tutoring_Sessions, Teacher_Quality, Access_to_Resources.
+
+Hallazgos:
+  - Calidad docente: tendencia monótona creciente clara (Low < Medium < High).
+    Es el predictor categórico más prometedor del eje.
+  - Acceso a recursos: también muestra tendencia positiva, aunque con mayor
+    solapamiento.
+  - Tutorías: diferencia ligera; los aprobados tienen un poco más de sesiones.
+
+Conclusión: el apoyo educativo (calidad docente + acceso a recursos) es el
+segundo bloque más relevante después del esfuerzo académico.
+
+--------------------------------------------------------------------------------
+3.7. VARIABLES ADICIONALES
+--------------------------------------------------------------------------------
+
+Variables analizadas: Internet_Access, Learning_Disabilities, Peer_Influence,
+Distance_from_Home, Extracurricular_Activities.
+
+Hallazgos:
+  - Acceso a internet: ~92% tiene acceso; la tasa de aprobación es similar entre
+    quienes tienen y no tienen. Variable casi constante → bajo poder discriminante.
+  - Discapacidades de aprendizaje: ~89% sin discapacidad; quienes la tienen
+    aprueban menos. Útil pero desbalanceada.
+  - Influencia de pares: los estudiantes con influencia positiva aprueban más
+    que los con influencia negativa. Señal moderada.
+  - Distancia desde casa: los estudiantes cercanos aprueban más que los lejanos.
+    Señal leve.
+  - Actividades extracurriculares: diferencia mínima.
+
+Conclusión: de estas variables, Peer_Influence y Learning_Disabilities son las
+más prometedoras. Internet_Access podría descartarse por baja varianza.
+
+--------------------------------------------------------------------------------
+3.8. ANÁLISIS DE ASOCIACIÓN (CATEGÓRICAS)
+--------------------------------------------------------------------------------
+
+Se calcula chi-cuadrado y V de Cramér para las 13 variables categóricas contra
+Approved. Esto permite priorizar features de forma objetiva.
+
+Resultados (ordenados por V de Cramér):
+  - Parental_Involvement (V=0.1315, p<0.05) → significativa.
+  - Access_to_Resources (V=0.1308, p<0.05) → significativa.
+  - Parental_Education_Level (V=0.0957, p<0.05) → significativa.
+  - Learning_Disabilities (V=0.0950, p<0.05) → significativa.
+  - Motivation_Level (V=0.0866, p<0.05) → significativa.
+  - Distance_from_Home (V=0.0793, p<0.05) → significativa.
+  - Peer_Influence (V=0.0780, p<0.05) → significativa.
+  - Family_Income (V=0.0664, p<0.05) → significativa.
+  - Extracurricular_Activities (V=0.0648, p<0.05) → significativa.
+  - Teacher_Quality (V=0.0605, p<0.05) → significativa.
+  - Internet_Access (V=0.0443, p<0.05) → significativa pero débil.
+  - School_Type (V=0.0157, p>0.05) → NO significativa.
+  - Gender (V=0.0114, p>0.05) → NO significativa.
+
+Decisión preliminar: conservar variables con p < 0.05 y V_Cramer > 0.05.
+Excluir Internet_Access si se confirma baja varianza. School_Type y Gender no
+son significativas.
+
+--------------------------------------------------------------------------------
+3.9. MATRIZ DE CORRELACIÓN (NUMÉRICAS)
+--------------------------------------------------------------------------------
+
+Se calcula la correlación de Pearson entre variables numéricas y Exam_Score.
+
+Resultados (correlación con Exam_Score):
+  - Approved: 0.6415 (por construcción).
+  - Attendance: 0.5824 (la más fuerte).
+  - Hours_Studied: 0.4460.
+  - Previous_Scores: 0.1748.
+  - Tutoring_Sessions: 0.1540.
+  - Physical_Activity: 0.0276 (casi nula).
+  - Sleep_Hours: -0.0163 (casi nula).
+
+Interpretación:
+  - Attendance y Hours_Studied son las variables numéricas con mayor correlación
+    positiva (moderada, ~0.3–0.5).
+  - Previous_Scores también correlaciona positivamente, confirmando su valor
+    predictivo.
+  - Sleep_Hours y Physical_Activity tienen correlación cercana a cero → no
+    aportan de forma lineal.
+  - La baja correlación no descarta relaciones no lineales; los modelos de árboles
+    podrían capturarlas, pero la evidencia visual del Eje 3 sugiere que no hay
+    señal.
+
+--------------------------------------------------------------------------------
+3.10. SÍNTESIS DE HALLAZGOS Y RUTA METODOLÓGICA
+--------------------------------------------------------------------------------
+
+Pregunta actualizada: se CONFIRMA la pregunta original, con dos precisiones:
+  1. El análisis se enfoca en los dos bloques con mayor señal: esfuerzo académico
+     (Eje 1) y apoyo y recursos educativos (Eje 4). Los ejes 2 y 3 se reportan
+     como factores con efecto débil o nulo.
+  2. Se reformula el target: clasificación binaria de Approved (umbral 65) en
+     lugar de regresión sobre Exam_Score.
+
+Hallazgos principales:
+  1. El esfuerzo académico es el bloque más predictivo (Attendance lidera).
+  2. El apoyo educativo importa (Teacher_Quality y Access_to_Resources).
+  3. El bienestar físico tiene impacto limitado (solo Motivation_Level aporta).
+  4. El contexto socioeconómico es débil en forma directa.
+  5. Variables adicionales con señal: Peer_Influence y Learning_Disabilities.
+     Internet_Access es casi constante → bajo poder discriminante.
+
+Decisiones preliminares para el modelamiento (Entrega 3):
+  - Modelar Approved (clasificación binaria), no Exam_Score (regresión).
+  - Priorizar features de esfuerzo y apoyo.
+  - Evaluar exclusión de Internet_Access.
+  - Considerar class_weight='balanced' (balance ~78/22).
+  - Explorar modelos de árboles (Random Forest, Gradient Boosting).
+  - Comparar con Regresión Logística (baseline interpretable).
+  - Métricas: F1, ROC-AUC, precision-recall (no solo accuracy).
+  - Validación cruzada estratificada (k=5).
+
+Próximos pasos concretos:
+  1. Notebook 03 — Feature engineering: encoding, escalado, selección de features.
+  2. Notebook 04 — Modelamiento: baseline + modelos de árboles con CV estratificada.
+  3. Notebook 05 — Evaluación final: matriz de confusión, curvas ROC/PR,
+     interpretabilidad.
+
+Riesgos identificados y mitigación:
+  - Desbalance moderado ~78/22 → probar class_weight y SMOTE si es necesario.
+  - Baja varianza de Exam_Score → modelar Approved (binario).
+  - Internet_Access y Learning_Disabilities casi constantes → evaluar exclusión.
+  - Imputación mediana/moda puede subestimar varianza → comparar con KNN imputation.
+  - Relaciones no lineales → incluir modelos de árboles.
+  - Tiempo restante → priorizar baseline LogReg, un modelo de árboles y evaluación
+    con CV estratificada.
+
+--------------------------------------------------------------------------------
+3.11. LIMITACIONES DEL ANÁLISIS
+--------------------------------------------------------------------------------
+
+1. Datos observacionales, no experimentales → las asociaciones no implican
+   causalidad.
+2. Baja varianza del target (Exam_Score, std ≈ 4.2) → limita la capacidad
+   discriminante de cualquier modelo.
+3. Variables auto-reportadas (Motivation_Level, Parental_Involvement,
+   Teacher_Quality) → posible sesgo de deseabilidad social.
+4. Desbalance moderado (~78/22) → requiere métricas adecuadas (F1, ROC-AUC).
+5. Imputación con mediana/moda → puede subestimar la varianza.
+6. Sin información temporal ni geográfica → no permite analizar tendencias ni
+   efectos contextuales.
+7. V de Cramér mide asociación, no dirección → para variables ordinales conviene
+   complementar con análisis de tendencia (Mann-Whitney, Kruskal-Wallis).
+
+
+4. HALLAZGOS Y OBSERVACIONES PARA LAS SIGUIENTES ETAPAS
+--------------------------------------------------------------------------------
+
+1. El esfuerzo académico (Eje 1) es el bloque más predictivo, con Attendance como
+   la variable individual más fuerte.
+
+2. El apoyo educativo (Eje 4) es el segundo bloque más relevante; Teacher_Quality
+   muestra una tendencia monótona clara.
+
+3. El bienestar físico (Eje 3) no discrimina el rendimiento; solo Motivation_Level
+   aporta levemente.
+
+4. El contexto socioeconómico (Eje 2) tiene un efecto débil o mediado por otras
+   variables.
+
+5. Variables adicionales con señal: Peer_Influence y Learning_Disabilities.
+   Internet_Access es casi constante → bajo poder discriminante.
+
+6. La clasificación binaria de Approved es más informativa que la regresión sobre
+   Exam_Score, dada la baja varianza de esta última.
+
+7. School_Type y Gender no son significativas según el análisis de asociación
+   → candidatas a exclusión en el modelamiento.
+
+
+5. CÓMO EJECUTAR ESTE NOTEBOOK
+--------------------------------------------------------------------------------
+
+Requisitos:
+  - Python 3.10 o superior.
+  - Librerías: pandas, numpy, matplotlib, seaborn, scipy.
+  - Instalación:
+        pip install pandas numpy matplotlib seaborn scipy
+
+Pasos:
+  1) Asegurarse de haber ejecutado el Notebook 01 para generar
+     data/processed/student_performance_clean.csv.
+  2. Abrir el notebook desde Jupyter Lab / Notebook / VS Code.
+  3) Ejecutar todas las celdas en orden (Kernel -> Restart & Run All).
+  4) Revisar las visualizaciones y las interpretaciones en los markdowns.
+  5) Utilizar los hallazgos y las decisiones documentadas para el video de
+     avance (Entrega 2) y para guiar el modelamiento (Entrega 3).
+
+Tiempo estimado de ejecución: 1-2 minutos.
+
+
+6. DEPENDENCIAS CON OTROS NOTEBOOKS
+--------------------------------------------------------------------------------
+
+Notebook anterior : 01_carga_y_limpieza.ipynb
+                    -> Consume el CSV generado en data/processed/.
+
+Notebook siguiente: 03_feature_engineering.ipynb
+                    -> Utiliza los hallazgos y decisiones de este EDA para
+                       seleccionar features, aplicar encoding y escalado.
+
+Notebooks posteriores:
+  04_modeling.ipynb             -> Entrenamiento y evaluación de modelos.
+  05_evaluacion_final.ipynb     -> Evaluación final, interpretabilidad y
+                                   comunicación de resultados.
+
+
+7. AUTORÍA Y CONTROL DE VERSIONES
+--------------------------------------------------------------------------------
+
+  Autor/a    : [completar nombre]
+  Curso      : [completar curso]
+  Docente    : [completar docente]
+  Institución: [completar institución]
+
+  Historial de cambios:
+  v1.0 — [fecha] — Versión inicial del EDA.
+                  * Análisis univariado de Exam_Score y Approved.
+                  * Análisis bivariado por los 4 ejes temáticos del proyecto.
+                  * Análisis de variables adicionales.
+                  * Asociación de categóricas con chi-cuadrado y V de Cramér.
+                  * Matriz de correlación de numéricas.
+                  * Síntesis de hallazgos y ruta metodológica para Entrega 3.
+                  * Limitaciones del análisis documentadas.
+
+================================================================================
+Fin del documento.
+================================================================================
